@@ -12,9 +12,13 @@ export function App() {
       <Route
         path="/prototype"
         element={
-          <Shell>
-            <AdminGate>{() => <PrototypesPage />}</AdminGate>
-          </Shell>
+          <AdminGate>
+            {() => (
+              <Shell>
+                <PrototypesPage />
+              </Shell>
+            )}
+          </AdminGate>
         }
       />
       <Route path="/prototype/:id" element={<AdminGate>{(config) => <AdminPresenterPage config={config} />}</AdminGate>} />
