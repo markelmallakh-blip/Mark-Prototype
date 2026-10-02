@@ -1,0 +1,37 @@
+{
+  "name": "mark-prototype",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "predev": "[ -x node_modules/.bin/concurrently ] || npm install",
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"tsx watch --clear-screen=false server/index.ts\" \"vite\"",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
+    "deploy": "vite build && wrangler deploy",
+    "predev:worker": "[ -x node_modules/.bin/vite ] || npm install",
+    "dev:worker": "vite build && wrangler dev --env dev --port 8787"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "lucide-react": "^1.48.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-router-dom": "^7.18.4",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260924.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.0",
+    "wrangler": "^4.138.0"
+  }
+}
