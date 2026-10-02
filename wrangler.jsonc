@@ -12,7 +12,11 @@
   "vars": {
     "PREVIEW_ORIGIN": "https://mark-prototype-preview.markelmallakh.workers.dev",
     // The GitHub Pages copy of the app calls this worker's /api.
-    "APP_ORIGINS": "https://markelmallakh-blip.github.io"
+    "APP_ORIGINS": "https://markelmallakh-blip.github.io",
+    // Admin sign-in: "Sign in with Google" OAuth client ID (public) + the emails allowed in (comma-separated).
+    // While GOOGLE_CLIENT_ID is empty, admins sign in with the ADMIN_PASSWORD secret instead.
+    "GOOGLE_CLIENT_ID": "",
+    "ADMIN_EMAILS": "markelmallakh@gmail.com"
   },
   "assets": {
     "directory": "./dist",

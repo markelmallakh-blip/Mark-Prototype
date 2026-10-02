@@ -9,7 +9,7 @@ import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { handleApi, lookupTarget } from './core/api.ts';
 import { handleProxy } from './core/proxy.ts';
 import type { Core, Data } from './core/types.ts';
-import { ADMIN_PASSWORD, DATA_FILE, PORT, PROXY_ORIGIN, PROXY_PORT, SESSION_SECRET } from './config.ts';
+import { ADMIN_EMAILS, ADMIN_PASSWORD, GOOGLE_CLIENT_ID, DATA_FILE, PORT, PROXY_ORIGIN, PROXY_PORT, SESSION_SECRET } from './config.ts';
 
 function load(): Data {
   try {
@@ -34,6 +34,8 @@ const core: Core = {
   secret: SESSION_SECRET,
   adminPassword: ADMIN_PASSWORD,
   requirePassword: false,
+  googleClientId: GOOGLE_CLIENT_ID,
+  adminEmails: ADMIN_EMAILS,
   proxyOrigin: (req) => {
     const u = new URL(req.url);
     return PROXY_ORIGIN || `${u.protocol}//${u.hostname}:${PROXY_PORT}`;

@@ -27,6 +27,10 @@ export interface Core {
   adminPassword: string;
   /** Refuse admin access entirely when no password is configured (production). */
   requirePassword: boolean;
+  /** "Sign in with Google" OAuth client ID. When set, it replaces the password sign-in. */
+  googleClientId: string;
+  /** Google emails allowed into the admin area (lower-case). */
+  adminEmails: string[];
   /** Origin of the masked preview host, as seen from this request. */
   proxyOrigin(req: Request): string;
 }

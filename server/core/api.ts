@@ -1,6 +1,7 @@
 import type { Device, ProjectAdmin, ProjectPublic } from '../../shared/types.ts';
 import { checkPreviewKey, isAdmin, issueAdminToken, previewKeyFor } from './auth.ts';
 import { randomId, safeEqual } from './crypto.ts';
+import { verifyGoogleIdToken } from './google.ts';
 import type { Core, Project, ProxyTarget } from './types.ts';
 
 class HttpError extends Error {
@@ -116,9 +117,21 @@ async function route(req: Request, core: Core): Promise<Response> {
   // --- Session ---------------------------------------------------------------
 
   if (path === '/config') {
-    return json({ proxyOrigin: core.proxyOrigin(req), authRequired: !!core.adminPassword || core.requirePassword });
+    return json({
+      proxyOrigin: core.proxyOrigin(req),
+      authRequired: !!core.adminPassword || core.requirePassword || !!core.googleClientId,
+      googleClientId: core.googleClientId || undefined,
+    });
+  }
+  if (path === '/admin/google' && method === 'POST') {
+    if (!core.googleClientId) throw new HttpError(404, 'Google sign-in isn’t set up');
+    const email = await verifyGoogleIdToken(str(body.credential, 4000), core.googleClientId);
+    if (!email) throw new HttpError(401, 'Google sign-in didn’t go through. Try again.');
+    if (!core.adminEmails.includes(email)) throw new HttpError(403, `${email} doesn’t have access to this workspace`);
+    return json({ token: await issueAdminToken(core) });
   }
   if (path === '/admin/login' && method === 'POST') {
+    if (core.googleClientId) throw new HttpError(403, 'Sign in with Google');
     if (!core.adminPassword && core.requirePassword) throw new HttpError(503, 'Admin password isn’t set up yet');
     const pw = str(body.password, 200);
     if (core.adminPassword && !safeEqual(pw, core.adminPassword)) throw new HttpError(401, 'That password isn’t right');

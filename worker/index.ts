@@ -18,6 +18,10 @@ export interface Env {
   ADMIN_PASSWORD?: string;
   /** Local `wrangler dev` only (`--var ALLOW_NO_PASSWORD:1`): skip admin sign-in. Never set in production. */
   ALLOW_NO_PASSWORD?: string;
+  /** "Sign in with Google" OAuth client ID (public). */
+  GOOGLE_CLIENT_ID?: string;
+  /** Comma-separated Google emails allowed into the admin area. */
+  ADMIN_EMAILS?: string;
 }
 
 const store = (env: Env) => env.STORE.get(env.STORE.idFromName('main'));
@@ -32,6 +36,8 @@ async function lookup(env: Env, value: string) {
   targets.set(value, { at: Date.now(), target });
   return target;
 }
+
+const emailList = (s?: string) => (s ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
 
 /** Lets the app hosted elsewhere (GitHub Pages) call the API. Auth is a bearer token, never cookies. */
 async function withCors(req: Request, env: Env, handle: () => Promise<Response>) {
@@ -89,6 +95,8 @@ export class Store extends DurableObject<Env> {
         secret,
         adminPassword: env.ADMIN_PASSWORD ?? '',
         requirePassword: env.ALLOW_NO_PASSWORD !== '1',
+        googleClientId: env.GOOGLE_CLIENT_ID ?? '',
+        adminEmails: emailList(env.ADMIN_EMAILS),
         proxyOrigin: () => env.PREVIEW_ORIGIN,
         persist: async () => {
           await storage.put('projects', this.core.data.projects);

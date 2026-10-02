@@ -32,4 +32,6 @@ export interface ProjectPublic {
 export interface AppConfig {
   proxyOrigin: string;
   authRequired: boolean;
+  /** Set when admins sign in with Google instead of a password. */
+  googleClientId?: string;
 }
