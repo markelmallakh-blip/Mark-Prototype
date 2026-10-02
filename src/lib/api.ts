@@ -1,3 +1,5 @@
+import { API_ORIGIN } from './runtime';
+
 const TOKEN_KEY = 'pt_admin_token';
 
 export const adminToken = {
@@ -42,7 +44,7 @@ export async function api<T>(
   if (token) headers.Authorization = `Bearer ${token}`;
   if (opts.previewKey) headers['X-Preview-Key'] = opts.previewKey;
   if (opts.body !== undefined) headers['Content-Type'] = 'application/json';
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_ORIGIN}/api${path}`, {
     method: opts.method ?? 'GET',
     headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,

@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Preview host for workers.dev deployments: forwards to the main `mark-prototype` worker.
+  "name": "mark-prototype-preview",
+  "main": "worker/preview.ts",
+  "compatibility_date": "2025-09-01",
+  "workers_dev": true,
+  "services": [{ "binding": "APP", "service": "mark-prototype" }]
+}

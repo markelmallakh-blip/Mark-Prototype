@@ -4,3 +4,5 @@ data
 .env
 .wrangler
 .claude
+dist-pages
+admin-password.txt

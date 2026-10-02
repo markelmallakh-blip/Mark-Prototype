@@ -8,9 +8,11 @@
     "dev": "concurrently -k -n api,web -c yellow,cyan \"tsx watch --clear-screen=false server/index.ts\" \"vite\"",
     "build": "vite build",
     "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
-    "deploy": "vite build && wrangler deploy",
     "predev:worker": "[ -x node_modules/.bin/vite ] || npm install",
-    "dev:worker": "vite build && wrangler dev --env dev --port 8787"
+    "dev:worker": "vite build && wrangler dev --env dev --port 8787",
+    "build:pages": "vite build --mode pages",
+    "deploy:api": "vite build && wrangler deploy && wrangler deploy -c wrangler.preview.jsonc",
+    "deploy:pages": "sh scripts/deploy-pages.sh"
   },
   "dependencies": {
     "express": "^5.2.1",

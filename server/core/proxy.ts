@@ -139,7 +139,9 @@ export async function handleProxy(req: Request, env: ProxyEnv): Promise<Response
       status: 302,
       headers: {
         location: to,
-        'set-cookie': `${COOKIE}=${value}; Path=/; SameSite=Lax${secure ? '; Secure' : ''}`,
+        // Over HTTPS the preview may be a different site from the app (e.g. two workers.dev hosts), so the
+        // cookie must be sendable inside a cross-site iframe; Partitioned keeps it to that embedding only.
+        'set-cookie': `${COOKIE}=${value}; Path=/; ${secure ? 'SameSite=None; Secure; Partitioned' : 'SameSite=Lax'}`,
         'cache-control': 'no-store',
       },
     });

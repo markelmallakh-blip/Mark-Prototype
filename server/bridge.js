@@ -12,7 +12,7 @@
 
   // Keep this tab's preview cookie current, in case another prototype was opened in another tab.
   function pinCookie() {
-    if (cfg.c) document.cookie = '__pt=' + cfg.c + '; path=/; SameSite=Lax' + (location.protocol === 'https:' ? '; Secure' : '');
+    if (cfg.c) document.cookie = '__pt=' + cfg.c + '; path=/; ' + (location.protocol === 'https:' ? 'SameSite=None; Secure; Partitioned' : 'SameSite=Lax');
   }
   pinCookie();
   ['focus', 'pageshow', 'pointerdown', 'keydown'].forEach(function (t) {

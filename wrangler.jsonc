@@ -5,14 +5,15 @@
   "compatibility_date": "2025-09-01",
   // Lets previews fetch sites on this same Cloudflare account (e.g. *.workers.dev) like any public site.
   "compatibility_flags": ["global_fetch_strictly_public"],
-  "workers_dev": false,
-  // Two hosts on the same registrable domain: the app, and a separate origin for masked previews.
-  // Replace both with your real subdomains (and PREVIEW_ORIGIN below) before `npm run deploy`.
-  "routes": [
-    { "pattern": "prototype.example.com", "custom_domain": true },
-    { "pattern": "preview.example.com", "custom_domain": true }
-  ],
-  "vars": { "PREVIEW_ORIGIN": "https://preview.example.com" },
+  // Live on workers.dev: this worker is the app; previews are served from a second host
+  // (wrangler.preview.jsonc) that forwards here. To move to your own domain, set "workers_dev": false,
+  // add two custom-domain routes (e.g. prototype.yourdomain.com + preview.yourdomain.com) and update PREVIEW_ORIGIN.
+  "workers_dev": true,
+  "vars": {
+    "PREVIEW_ORIGIN": "https://mark-prototype-preview.markelmallakh.workers.dev",
+    // The GitHub Pages copy of the app calls this worker's /api.
+    "APP_ORIGINS": "https://markelmallakh-blip.github.io"
+  },
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
