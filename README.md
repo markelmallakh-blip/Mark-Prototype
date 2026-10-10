@@ -1,6 +1,6 @@
 # Prototype
 
-Share a live website with a client the way you'd share a Figma prototype: inside a MacBook or iPhone mockup, **view only**, and without the client ever seeing the website's real address.
+Share a live website with a client the way you'd share a Figma prototype: inside a MacBook or iPhone mockup, with pinned comments, and without the client ever seeing the website's real address.
 
 ## Run it
 
@@ -20,10 +20,10 @@ With no `ADMIN_PASSWORD` set, admin sign-in is skipped (local dev only). Copy `.
 | --- | --- |
 | `/prototype` | Admin list of prototypes and **New prototype** (name, website link, MacBook 1512×982 or Mobile 430×932, optional "show only this device"). |
 | `/prototype/:id` | Admin presenter, plus **Share** (copy link, link on/off, reset link) and **Settings** (name, website link, default device, delete). |
-| `/p/:token` | What the client opens: the device mockup and a Desktop/Mobile switch. No URL anywhere, no comments, no sign-in. |
+| `/p/:token` | What the client opens: the device mockup, a Desktop/Mobile switch, the comment tool (`C`) and the comments column. Visitors enter their name once; no URL anywhere, no sign-in. |
 | `server/core/proxy.ts` | The **masked preview origin**. The iframe loads this origin, which forwards requests to the real site and rewrites its host, so the browser only ever sees the preview host. |
-| `server/bridge.js` | Injected into every previewed page. Reports the current page to the presenter and keeps links inside the prototype. |
-| `server/core/api.ts` | Projects (admin only; the only responses that include the URL) and the public share info (name and device only). |
+| `server/bridge.js` | Injected into every previewed page. Draws comment pins *inside* the page (so they stay on their spot while scrolling), captures clicks and area drags in comment mode, reports the current page, and keeps links inside the prototype. |
+| `server/core/api.ts` | Projects (admin only; the only responses that include the URL), and share info + comments (public by token, live updates over SSE). Visitors can delete only their own comments; admins can delete any and comment as "team". |
 
 ### How the link stays hidden
 
