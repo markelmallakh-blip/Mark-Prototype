@@ -132,7 +132,7 @@ function SharePopover({ project, update, setProject, onClose }: {
   return (
     <div ref={ref} className="absolute right-2 top-14 z-40 w-[360px] max-w-[calc(100vw-16px)] animate-pop-in rounded-2xl border bg-card p-4 text-card-foreground shadow-2xl">
       <h3 className="text-sm font-bold">Share prototype</h3>
-      <p className="mt-0.5 text-xs text-muted-foreground">Anyone with the link can view the prototype in its device mockup. Nothing else.</p>
+      <p className="mt-0.5 text-xs text-muted-foreground">Anyone with the link can view the prototype and leave comments.</p>
 
       <div className="mt-4 flex gap-2">
         <Input readOnly value={project.shareEnabled ? link : 'Link sharing is off'} onFocus={(e) => e.target.select()} className={cn('h-9 font-mono text-xs', !project.shareEnabled && 'text-muted-foreground')} />
@@ -200,7 +200,7 @@ function SettingsDrawer({ project, update, onClose, onDeleted }: {
   }
 
   async function remove() {
-    if (!confirm(`Delete “${project.name}”? Its share link stops working. This can’t be undone.`)) return;
+    if (!confirm(`Delete “${project.name}” and all its comments? This can’t be undone.`)) return;
     await api(`/projects/${project.id}`, { method: 'DELETE' });
     onDeleted();
   }
@@ -230,7 +230,7 @@ function SettingsDrawer({ project, update, onClose, onDeleted }: {
         )}
         <div className="border-t pt-5">
           <h4 className="text-[13px] font-semibold">Delete prototype</h4>
-          <p className="mt-0.5 text-xs text-muted-foreground">Removes the prototype and turns off its share link.</p>
+          <p className="mt-0.5 text-xs text-muted-foreground">Removes the share link and every comment.</p>
           <Button variant="outline" size="sm" className="mt-3 text-destructive" onClick={remove}>
             <Trash2 className="size-3.5" /> Delete
           </Button>

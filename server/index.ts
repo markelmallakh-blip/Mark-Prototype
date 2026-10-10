@@ -7,16 +7,19 @@ import path from 'node:path';
 import { Readable, pipeline } from 'node:stream';
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { handleApi, lookupTarget } from './core/api.ts';
+import { Hub } from './core/hub.ts';
 import { handleProxy } from './core/proxy.ts';
-import type { Core, Data } from './core/types.ts';
+import type { Core, Data, Project } from './core/types.ts';
 import { ADMIN_EMAILS, ADMIN_PASSWORD, GOOGLE_CLIENT_ID, DATA_FILE, PORT, PROXY_ORIGIN, PROXY_PORT, SESSION_SECRET } from './config.ts';
 
 function load(): Data {
   try {
     const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    return { projects: d.projects ?? [] };
+    // Projects saved before comments existed have no comment counter yet.
+    const projects = (d.projects ?? []).map((p: Project) => ({ ...p, nextNumber: p.nextNumber ?? 1 }));
+    return { projects, comments: d.comments ?? [] };
   } catch {
-    return { projects: [] };
+    return { projects: [], comments: [] };
   }
 }
 
@@ -41,6 +44,7 @@ const core: Core = {
     return PROXY_ORIGIN || `${u.protocol}//${u.hostname}:${PROXY_PORT}`;
   },
 };
+const hub = new Hub();
 const BRIDGE_FILE = new URL('./bridge.js', import.meta.url);
 
 // --- Node <-> fetch adapter -------------------------------------------------------
@@ -88,7 +92,7 @@ function serve(handler: (req: Request) => Promise<Response>) {
   });
 }
 
-serve((req) => handleApi(req, core)).listen(PORT, () => console.log(`Prototype API on http://localhost:${PORT}`));
+serve((req) => handleApi(req, core, hub)).listen(PORT, () => console.log(`Prototype API on http://localhost:${PORT}`));
 serve((req) =>
   handleProxy(req, {
     lookup: (value) => lookupTarget(core, value),

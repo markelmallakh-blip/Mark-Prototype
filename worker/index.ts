@@ -5,8 +5,9 @@ import { DurableObject } from 'cloudflare:workers';
 import BRIDGE from '../server/bridge.js';
 import { handleApi, lookupTarget } from '../server/core/api.ts';
 import { randomId } from '../server/core/crypto.ts';
+import { Hub } from '../server/core/hub.ts';
 import { handleProxy } from '../server/core/proxy.ts';
-import type { Core, Project, ProxyTarget } from '../server/core/types.ts';
+import type { Core, Data, Project, ProxyTarget, StoredComment } from '../server/core/types.ts';
 
 export interface Env {
   STORE: DurableObjectNamespace<Store>;
@@ -39,7 +40,7 @@ async function lookup(env: Env, value: string) {
 
 const emailList = (s?: string) => (s ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
 
-/** Lets the app hosted elsewhere (GitHub Pages) call the API. Auth is a bearer token, never cookies. */
+/** Lets the app hosted elsewhere (GitHub Pages) call the API and open the live comment stream. Auth is a bearer token, never cookies. */
 async function withCors(req: Request, env: Env, handle: () => Promise<Response>) {
   const origin = req.headers.get('origin') ?? '';
   const allowed = (env.APP_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
@@ -75,9 +76,13 @@ export default {
   },
 } satisfies ExportedHandler<Env>;
 
-/** All projects live in one Durable Object: a single consistent copy. */
+/**
+ * All projects and comments live in one Durable Object: a single consistent copy that also
+ * holds the live-update streams. Projects are one key; each project's comments are their own key.
+ */
 export class Store extends DurableObject<Env> {
   private core!: Core;
+  private hub = new Hub();
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -88,18 +93,27 @@ export class Store extends DurableObject<Env> {
         secret = randomId(32);
         await storage.put('secret', secret);
       }
-      const projects = (await storage.get<Project[]>('projects')) ?? [];
+      // Projects saved before comments existed have no comment counter yet.
+      const projects = ((await storage.get<Project[]>('projects')) ?? []).map((p) => ({ ...p, nextNumber: p.nextNumber ?? 1 }));
+      const byProject = await storage.get<StoredComment[]>(projects.map((p) => `c:${p.id}`));
+      const data: Data = { projects, comments: [...byProject.values()].flat() };
 
       this.core = {
-        data: { projects },
+        data,
         secret,
         adminPassword: env.ADMIN_PASSWORD ?? '',
         requirePassword: env.ALLOW_NO_PASSWORD !== '1',
         googleClientId: env.GOOGLE_CLIENT_ID ?? '',
         adminEmails: emailList(env.ADMIN_EMAILS),
         proxyOrigin: () => env.PREVIEW_ORIGIN,
-        persist: async () => {
+        persist: async (projectId) => {
           await storage.put('projects', this.core.data.projects);
+          const ids = projectId ? [projectId] : this.core.data.projects.map((p) => p.id);
+          for (const id of ids) {
+            const cs = this.core.data.comments.filter((c) => c.projectId === id);
+            if (cs.length || this.core.data.projects.some((p) => p.id === id)) await storage.put(`c:${id}`, cs);
+            else await storage.delete(`c:${id}`);
+          }
           targets.clear();
         },
       };
@@ -111,6 +125,6 @@ export class Store extends DurableObject<Env> {
     if (url.pathname === '/__lookup') {
       return Response.json(await lookupTarget(this.core, url.searchParams.get('v') ?? ''));
     }
-    return handleApi(req, this.core);
+    return handleApi(req, this.core, this.hub);
   }
 }

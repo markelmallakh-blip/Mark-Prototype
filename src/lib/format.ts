@@ -7,6 +7,23 @@ export function timeAgo(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+export function initials(name: string) {
+  // Ignore punctuation-only chunks like "(Client)" or "—".
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ''))
+    .filter(Boolean);
+  return ((parts[0]?.[0] ?? '?') + (parts.length > 1 ? parts[parts.length - 1][0] : '')).toUpperCase();
+}
+
+const AVATAR_COLORS = ['#f97316', '#10b981', '#3b82f6', '#a855f7', '#ec4899', '#14b8a6', '#ef4444', '#6366f1'];
+export function avatarColor(seed: string) {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0;
+  return AVATAR_COLORS[Math.abs(h) % AVATAR_COLORS.length];
+}
+
 export const cn = (...c: Array<string | false | null | undefined>) => c.filter(Boolean).join(' ');
 
 export const samePath = (a: string, b: string) => (a.replace(/\/+$/, '') || '/') === (b.replace(/\/+$/, '') || '/');

@@ -1,8 +1,9 @@
-import type { Device, ProjectAdmin, ProjectPublic } from '../../shared/types.ts';
+import type { Anchor, CommentThread, Device, ProjectAdmin, ProjectPublic, Role } from '../../shared/types.ts';
 import { checkPreviewKey, isAdmin, issueAdminToken, previewKeyFor } from './auth.ts';
-import { randomId, safeEqual } from './crypto.ts';
+import { randomId, safeEqual, sha256Hex } from './crypto.ts';
 import { verifyGoogleIdToken } from './google.ts';
-import type { Core, Project, ProxyTarget } from './types.ts';
+import type { Hub } from './hub.ts';
+import type { Core, Project, ProxyTarget, StoredComment } from './types.ts';
 
 class HttpError extends Error {
   constructor(
@@ -51,6 +52,33 @@ async function resolveTarget(input: unknown) {
   return { url: url.toString(), targetOrigin: final.origin, startPath: final.pathname + final.search, reachable };
 }
 
+function toThread(c: StoredComment): CommentThread {
+  const { projectId: _p, secretHash: _s, replies, ...rest } = c;
+  return { ...rest, replies: replies.map(({ secretHash: _h, ...r }) => r) };
+}
+
+function readAnchor(v: unknown): Anchor {
+  const a = (v ?? {}) as Record<string, unknown>;
+  const num = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? Math.round(n * 10) / 10 : undefined);
+  const x = num(a.x);
+  const y = num(a.y);
+  if (x === undefined || y === undefined) throw new HttpError(400, 'Missing comment position');
+  const anchor: Anchor = { x, y, vw: num(a.vw) ?? 0 };
+  const selector = str(a.selector, 1200);
+  if (selector && num(a.ox) !== undefined && num(a.oy) !== undefined) {
+    anchor.selector = selector;
+    anchor.ox = num(a.ox);
+    anchor.oy = num(a.oy);
+  }
+  const w = num(a.w);
+  const h = num(a.h);
+  if (w !== undefined && h !== undefined && w > 0 && h > 0) {
+    anchor.w = Math.min(w, 20000);
+    anchor.h = Math.min(h, 50000);
+  }
+  return anchor;
+}
+
 /** Share access: public link switched on, or an admin (bearer token or preview key). */
 export async function shareAccess(core: Core, token: string, req: Request | null, key?: unknown) {
   const p = core.data.projects.find((x) => x.shareToken === token);
@@ -71,9 +99,9 @@ export async function lookupTarget(core: Core, value: string): Promise<ProxyTarg
 }
 
 /** Handles every /api/* request. */
-export async function handleApi(req: Request, core: Core): Promise<Response> {
+export async function handleApi(req: Request, core: Core, hub: Hub): Promise<Response> {
   try {
-    return await route(req, core);
+    return await route(req, core, hub);
   } catch (err) {
     if (err instanceof HttpError) return json({ error: err.message }, err.status);
     console.error(err);
@@ -81,7 +109,7 @@ export async function handleApi(req: Request, core: Core): Promise<Response> {
   }
 }
 
-async function route(req: Request, core: Core): Promise<Response> {
+async function route(req: Request, core: Core, hub: Hub): Promise<Response> {
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/api/, '').replace(/\/+$/, '') || '/';
   const method = req.method;
@@ -93,15 +121,21 @@ async function route(req: Request, core: Core): Promise<Response> {
   const m = (re: RegExp) => re.exec(path);
   let r: RegExpExecArray | null;
 
+  const admin = () => isAdmin(core, req);
   const requireAdmin = async () => {
-    if (!(await isAdmin(core, req))) throw new HttpError(401, 'Admin sign-in required');
+    if (!(await admin())) throw new HttpError(401, 'Admin sign-in required');
   };
 
-  const toAdmin = async (p: Project): Promise<ProjectAdmin> => ({
-    ...p,
-    lockDevice: !!p.lockDevice,
-    previewKey: await previewKeyFor(core, p.shareToken),
-  });
+  const counts = (projectId: string) => {
+    const cs = data.comments.filter((c) => c.projectId === projectId);
+    return { openComments: cs.filter((c) => !c.resolved).length, totalComments: cs.length };
+  };
+
+  const toAdmin = async (p: Project): Promise<ProjectAdmin> => {
+    const { nextNumber: _n, ...rest } = p;
+    return { ...rest, lockDevice: !!p.lockDevice, ...counts(p.id), previewKey: await previewKeyFor(core, p.shareToken) };
+  };
+  const threads = (projectId: string) => data.comments.filter((c) => c.projectId === projectId).map(toThread);
   const toPublic = (p: Project): ProjectPublic => ({ name: p.name, device: p.device, lockDevice: !!p.lockDevice });
   const findProject = (id: string) => {
     const p = data.projects.find((x) => x.id === id);
@@ -112,6 +146,29 @@ async function route(req: Request, core: Core): Promise<Response> {
     const p = await shareAccess(core, token, req, req.headers.get('x-preview-key') ?? url.searchParams.get('k'));
     if (!p) throw new HttpError(404, 'This prototype link isn’t available');
     return p;
+  };
+  const findComment = (p: Project, id: string) => {
+    const c = data.comments.find((x) => x.projectId === p.id && x.id === id);
+    if (!c) throw new HttpError(404, 'Comment not found');
+    return c;
+  };
+  const author = async () => {
+    const name = str(body.author, 60);
+    const authorId = str(body.authorId, 64);
+    const secret = str(body.secret, 128);
+    if (!name) throw new HttpError(400, 'Add your name so the team knows who commented');
+    if (!authorId || secret.length < 16) throw new HttpError(400, 'Missing commenter identity');
+    const role: Role = (await admin()) ? 'team' : 'guest';
+    return { author: name, authorId, secretHash: await sha256Hex(secret), role };
+  };
+  const canModify = async (secretHash: string) => {
+    const secret = str(body.secret ?? req.headers.get('x-comment-secret'), 128);
+    return (await admin()) || (!!secret && safeEqual(await sha256Hex(secret), secretHash));
+  };
+  const changed = async (p: Project) => {
+    p.updatedAt = now();
+    await core.persist(p.id);
+    hub.send(p.id, `event: comments\ndata: ${JSON.stringify(threads(p.id))}\n\n`);
   };
 
   // --- Session ---------------------------------------------------------------
@@ -166,9 +223,10 @@ async function route(req: Request, core: Core): Promise<Response> {
       lockDevice: body.lockDevice === true,
       createdAt: now(),
       updatedAt: now(),
+      nextNumber: 1,
     };
     data.projects.push(p);
-    await core.persist();
+    await core.persist(p.id);
     return json({ ...(await toAdmin(p)), reachable: target.reachable }, 201);
   }
   if ((r = m(/^\/projects\/([^/]+)$/))) {
@@ -191,12 +249,13 @@ async function route(req: Request, core: Core): Promise<Response> {
         reachable = t.reachable;
       }
       p.updatedAt = now();
-      await core.persist();
+      await core.persist(p.id);
       return json({ ...(await toAdmin(p)), reachable });
     }
     if (method === 'DELETE') {
       data.projects.splice(data.projects.indexOf(p), 1);
-      await core.persist();
+      data.comments = data.comments.filter((c) => c.projectId !== p.id);
+      await core.persist(p.id);
       return json({ ok: true });
     }
   }
@@ -205,7 +264,7 @@ async function route(req: Request, core: Core): Promise<Response> {
     const p = findProject(r[1]);
     p.shareToken = newShareToken();
     p.updatedAt = now();
-    await core.persist();
+    await core.persist(p.id);
     return json(await toAdmin(p));
   }
 
@@ -218,6 +277,83 @@ async function route(req: Request, core: Core): Promise<Response> {
     const icon = await favicon(p);
     if (!icon) throw new HttpError(404, 'No icon');
     return new Response(icon.body, { headers: { 'content-type': icon.type, 'cache-control': 'private, max-age=3600' } });
+  }
+
+  if ((r = m(/^\/share\/([^/]+)\/stream$/))) {
+    const p = await share(r[1]);
+    const stream = hub.open(p.id, `event: comments\ndata: ${JSON.stringify(threads(p.id))}\n\n`);
+    return new Response(stream, {
+      headers: {
+        'content-type': 'text/event-stream',
+        'cache-control': 'no-cache, no-transform',
+        'x-accel-buffering': 'no',
+      },
+    });
+  }
+
+  if ((r = m(/^\/share\/([^/]+)\/comments$/))) {
+    const p = await share(r[1]);
+    if (method === 'GET') return json(threads(p.id));
+    const text = str(body.text, 4000);
+    if (!text) throw new HttpError(400, 'Write a comment first');
+    const c: StoredComment = {
+      id: randomId(8),
+      projectId: p.id,
+      number: p.nextNumber++,
+      path: str(body.path, 600) || '/',
+      pageTitle: str(body.pageTitle, 200),
+      device: isDevice(body.device) && (!p.lockDevice || (await admin())) ? body.device : p.device,
+      anchor: readAnchor(body.anchor),
+      ...(await author()),
+      text,
+      createdAt: now(),
+      resolved: false,
+      resolvedBy: null,
+      replies: [],
+    };
+    data.comments.push(c);
+    await changed(p);
+    return json(toThread(c), 201);
+  }
+
+  if ((r = m(/^\/share\/([^/]+)\/comments\/([^/]+)\/replies$/)) && method === 'POST') {
+    const p = await share(r[1]);
+    const c = findComment(p, r[2]);
+    const text = str(body.text, 4000);
+    if (!text) throw new HttpError(400, 'Write a reply first');
+    c.replies.push({ id: randomId(8), ...(await author()), text, createdAt: now() });
+    await changed(p);
+    return json(toThread(c), 201);
+  }
+
+  if ((r = m(/^\/share\/([^/]+)\/comments\/([^/]+)\/replies\/([^/]+)$/)) && method === 'DELETE') {
+    const p = await share(r[1]);
+    const c = findComment(p, r[2]);
+    const reply = c.replies.find((x) => x.id === r![3]);
+    if (!reply) throw new HttpError(404, 'Reply not found');
+    if (!(await canModify(reply.secretHash))) throw new HttpError(403, 'Only the author or the team can delete this');
+    c.replies.splice(c.replies.indexOf(reply), 1);
+    await changed(p);
+    return json(toThread(c));
+  }
+
+  if ((r = m(/^\/share\/([^/]+)\/comments\/([^/]+)$/))) {
+    const p = await share(r[1]);
+    const c = findComment(p, r[2]);
+    if (method === 'PATCH') {
+      if (typeof body.resolved === 'boolean') {
+        c.resolved = body.resolved;
+        c.resolvedBy = c.resolved ? str(body.by, 60) || null : null;
+      }
+      await changed(p);
+      return json(toThread(c));
+    }
+    if (method === 'DELETE') {
+      if (!(await canModify(c.secretHash))) throw new HttpError(403, 'Only the author or the team can delete this');
+      data.comments.splice(data.comments.indexOf(c), 1);
+      await changed(p);
+      return json({ ok: true });
+    }
   }
 
   throw new HttpError(404, 'Not found');

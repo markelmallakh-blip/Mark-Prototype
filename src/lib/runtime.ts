@@ -1,3 +1,5 @@
+import type { CommentThread } from '../../shared/types';
+
 /**
  * Where the API lives. Empty in local dev (Vite proxies /api). On GitHub Pages the app is static,
  * so it calls the Cloudflare worker (API + masked preview) set at build time.
@@ -22,4 +24,11 @@ export function previewSrc(o: { proxyOrigin: string; token: string; previewKey?:
   return `${o.proxyOrigin}/__pt/start?t=${encodeURIComponent(o.token)}${o.previewKey ? `&k=${o.previewKey}` : ''}${
     o.path ? `&path=${encodeURIComponent(o.path)}` : ''
   }`;
+}
+
+/** Live comment list for a prototype. Returns an unsubscribe function. */
+export function subscribeComments(token: string, previewKey: string | undefined, onChange: (list: CommentThread[]) => void) {
+  const es = new EventSource(`${API_ORIGIN}/api/share/${token}/stream${previewKey ? `?k=${previewKey}` : ''}`);
+  es.addEventListener('comments', (e) => onChange(JSON.parse((e as MessageEvent).data)));
+  return () => es.close();
 }

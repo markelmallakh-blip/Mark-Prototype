@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Check, Laptop, Link2, Lock, Plus, Smartphone } from 'lucide-react';
+import { Check, Laptop, Link2, Lock, MessageCircle, Plus, Smartphone } from 'lucide-react';
 import type { ProjectAdmin } from '../../shared/types';
 import { NewPrototypeDialog } from '../components/NewPrototypeDialog';
 import { Button, Spinner } from '../components/ui';
 import { api } from '../lib/api';
-import { timeAgo } from '../lib/format';
+import { cn, timeAgo } from '../lib/format';
 import { faviconUrl, shareUrl } from '../lib/runtime';
 
 export function PrototypesPage() {
@@ -24,7 +24,7 @@ export function PrototypesPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Prototypes</h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Share a live website as a view-only prototype. Clients see it inside a MacBook or mobile mockup, and the real link stays hidden.
+            Share a live website as a prototype. Clients see it inside a MacBook or mobile mockup and leave comments on the page. The real link stays hidden.
           </p>
         </div>
         {projects && projects.length > 0 && (
@@ -115,6 +115,9 @@ function ProjectCard({ project: p, onOpen }: { project: ProjectAdmin; onOpen: ()
             <Icon className="size-3.5" /> {p.device === 'desktop' ? 'MacBook' : 'Mobile'}
             {p.lockDevice && <Lock className="size-3" aria-label="Only this device" />}
           </span>
+          <span className={cn('inline-flex items-center gap-1', p.openComments > 0 && 'font-semibold text-foreground')}>
+            <MessageCircle className="size-3.5" /> {p.openComments} open
+          </span>
           <span className="ml-auto">{timeAgo(p.updatedAt)}</span>
           <button
             onClick={copy}
@@ -169,7 +172,7 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
       </div>
       <h2 className="font-semibold">No prototypes yet</h2>
       <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-        Add a website link, pick MacBook or mobile, and share a view-only link with your client.
+        Add a website link, pick MacBook or mobile, and share a link your client can comment on.
       </p>
       <Button variant="brand" className="mt-5" onClick={onCreate}>
         <Plus className="size-4" /> New prototype
