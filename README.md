@@ -34,13 +34,22 @@ With no `ADMIN_PASSWORD` set, admin sign-in is skipped (local dev only). Copy `.
 
 ## Deploying (Cloudflare)
 
-The preview **must be a different origin** from the app, otherwise the previewed site could read the admin session. Use two subdomains of the same domain (the preview cookie has to work inside the iframe):
+Live at **https://mark-prototype.markelmallakh.workers.dev** (dashboard: `/prototype`, client links: `/p/<key>`).
+Previews come from **https://mark-prototype-preview.markelmallakh.workers.dev** (`wrangler.preview.jsonc`, forwards to the main worker).
 
-1. In `wrangler.jsonc`, replace `prototype.example.com` / `preview.example.com` and `PREVIEW_ORIGIN` with your subdomains.
-2. `npx wrangler secret put ADMIN_PASSWORD`
-3. `npm run deploy`
+The app and the preview must be:
 
-`npm run dev:worker` runs the Cloudflare version locally (`localhost:8787` = app, `127.0.0.1:8787` = previews).
+- **Different origins**, otherwise the previewed site could read the admin session.
+- **The same site** (subdomains of one registrable domain; `markelmallakh.workers.dev` counts, because `workers.dev` is a public suffix). The preview identifies its project with a cookie inside the iframe, and Safari blocks cookies in cross-site iframes entirely. This is why the app is not hosted on GitHub Pages.
+
+```bash
+npm run deploy          # build + deploy both workers
+npm run deploy:pages    # republish the GitHub Pages redirect (old github.io links → the Cloudflare app)
+```
+
+Admins sign in with Google: `GOOGLE_CLIENT_ID` and `ADMIN_EMAILS` in `wrangler.jsonc`. The OAuth client's authorized JavaScript origins must include the app origin. To move to your own domain, use two subdomains of it (e.g. `prototype.` and `preview.`) as custom-domain routes and update `PREVIEW_ORIGIN`.
+
+`npm run dev:worker` runs the Cloudflare version locally. To mimic production (same site, different origins), add `--var PREVIEW_ORIGIN:http://preview.localtest.me:8787` and open `http://app.localtest.me:8787`.
 
 ## Limitations
 

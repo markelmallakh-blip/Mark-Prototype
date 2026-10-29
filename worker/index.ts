@@ -1,6 +1,7 @@
 // Production: the whole app on Cloudflare.
 //   APP host      → the app (static files) + /api (Durable Object below)
 //   PREVIEW host  → masked previews (server/core/proxy.ts)
+// Both hosts must be the same site (e.g. *.markelmallakh.workers.dev) so the preview cookie works in Safari.
 import { DurableObject } from 'cloudflare:workers';
 import BRIDGE from '../server/bridge.js';
 import { handleApi, lookupTarget } from '../server/core/api.ts';
@@ -13,8 +14,6 @@ export interface Env {
   STORE: DurableObjectNamespace<Store>;
   ASSETS: Fetcher;
   PREVIEW_ORIGIN: string;
-  /** Comma-separated origins of hosted copies of the app (e.g. GitHub Pages) allowed to call /api. */
-  APP_ORIGINS?: string;
   /** Set with `wrangler secret put ADMIN_PASSWORD`. */
   ADMIN_PASSWORD?: string;
   /** Local `wrangler dev` only (`--var ALLOW_NO_PASSWORD:1`): skip admin sign-in. Never set in production. */
@@ -40,25 +39,6 @@ async function lookup(env: Env, value: string) {
 
 const emailList = (s?: string) => (s ?? '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
 
-/** Lets the app hosted elsewhere (GitHub Pages) call the API and open the live comment stream. Auth is a bearer token, never cookies. */
-async function withCors(req: Request, env: Env, handle: () => Promise<Response>) {
-  const origin = req.headers.get('origin') ?? '';
-  const allowed = (env.APP_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (!allowed.includes(origin)) return handle();
-  const cors = {
-    'access-control-allow-origin': origin,
-    'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS',
-    'access-control-allow-headers': 'authorization, content-type, x-preview-key',
-    'access-control-max-age': '86400',
-    vary: 'origin',
-  };
-  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
-  const res = await handle();
-  const out = new Response(res.body, res);
-  for (const [k, v] of Object.entries(cors)) out.headers.set(k, v);
-  return out;
-}
-
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
@@ -66,7 +46,7 @@ export default {
     if (url.host === previewHost || req.headers.get('host') === previewHost) {
       return handleProxy(req, { lookup: (v) => lookup(env, v), bridge: () => BRIDGE, origin: env.PREVIEW_ORIGIN });
     }
-    if (url.pathname.startsWith('/api/')) return withCors(req, env, () => store(env).fetch(req));
+    if (url.pathname.startsWith('/api/')) return store(env).fetch(req);
     const asset = await env.ASSETS.fetch(req);
     // App routes like /prototype/abc or /p/token are client-side: serve the app shell.
     if (asset.status === 404 && req.method === 'GET' && !/\.[a-z0-9]+$/i.test(url.pathname)) {

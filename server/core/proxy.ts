@@ -139,9 +139,9 @@ export async function handleProxy(req: Request, env: ProxyEnv): Promise<Response
       status: 302,
       headers: {
         location: to,
-        // Over HTTPS the preview may be a different site from the app (e.g. two workers.dev hosts), so the
-        // cookie must be sendable inside a cross-site iframe; Partitioned keeps it to that embedding only.
-        'set-cookie': `${COOKIE}=${value}; Path=/; ${secure ? 'SameSite=None; Secure; Partitioned' : 'SameSite=Lax'}`,
+        // The app and the preview must be the same *site* (e.g. two subdomains of markelmallakh.workers.dev):
+        // Safari blocks cookies in cross-site iframes outright, while a same-site iframe gets Lax cookies everywhere.
+        'set-cookie': `${COOKIE}=${value}; Path=/; SameSite=Lax${secure ? '; Secure' : ''}`,
         'cache-control': 'no-store',
       },
     });

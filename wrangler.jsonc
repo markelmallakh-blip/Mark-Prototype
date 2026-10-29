@@ -5,14 +5,13 @@
   "compatibility_date": "2025-09-01",
   // Lets previews fetch sites on this same Cloudflare account (e.g. *.workers.dev) like any public site.
   "compatibility_flags": ["global_fetch_strictly_public"],
-  // Live on workers.dev: this worker is the app; previews are served from a second host
-  // (wrangler.preview.jsonc) that forwards here. To move to your own domain, set "workers_dev": false,
+  // Live on workers.dev: this worker is the app (https://mark-prototype.markelmallakh.workers.dev); previews are
+  // served from a second host (wrangler.preview.jsonc) that forwards here. Both are *.markelmallakh.workers.dev,
+  // i.e. the same site, which Safari requires for the preview cookie inside the iframe. To move to your own domain, set "workers_dev": false,
   // add two custom-domain routes (e.g. prototype.yourdomain.com + preview.yourdomain.com) and update PREVIEW_ORIGIN.
   "workers_dev": true,
   "vars": {
     "PREVIEW_ORIGIN": "https://mark-prototype-preview.markelmallakh.workers.dev",
-    // The GitHub Pages copy of the app calls this worker's /api.
-    "APP_ORIGINS": "https://markelmallakh-blip.github.io",
     // Admin sign-in: "Sign in with Google" OAuth client ID (public) + the emails allowed in (comma-separated).
     // While GOOGLE_CLIENT_ID is empty, admins sign in with the ADMIN_PASSWORD secret instead.
     "GOOGLE_CLIENT_ID": "696571539613-kf0ahej18mq16u9750gpp450aln5mip6.apps.googleusercontent.com",

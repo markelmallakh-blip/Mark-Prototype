@@ -10,9 +10,8 @@
     "typecheck": "tsc --noEmit && tsc --noEmit -p worker",
     "predev:worker": "[ -x node_modules/.bin/vite ] || npm install",
     "dev:worker": "vite build && wrangler dev --env dev --port 8787",
-    "build:pages": "vite build --mode pages",
-    "deploy:api": "vite build && wrangler deploy && wrangler deploy -c wrangler.preview.jsonc",
-    "deploy:pages": "sh scripts/deploy-pages.sh"
+    "deploy:pages": "sh scripts/deploy-pages.sh",
+    "deploy": "vite build && wrangler deploy && wrangler deploy -c wrangler.preview.jsonc"
   },
   "dependencies": {
     "express": "^5.2.1",
